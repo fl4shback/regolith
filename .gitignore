@@ -1,0 +1,5 @@
+.venv
+build
+dist
+regolith.conf
+regolith.spec
