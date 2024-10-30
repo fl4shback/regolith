@@ -35,7 +35,7 @@ jobs:
       - name: Build executable with PyInstaller
         run: |
           if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-            pyinstaller --target-arch universal2 --name regolith-mac --onefile regolith.py
+            pyinstaller --name regolith-mac --onefile regolith.py
           else
             pyinstaller --onefile regolith.py
           fi
