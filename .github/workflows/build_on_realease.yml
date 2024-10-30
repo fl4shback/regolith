@@ -33,12 +33,7 @@ jobs:
 
       # Build with PyInstaller
       - name: Build executable with PyInstaller
-        run: |
-          if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-            pyinstaller --onefile --windowed regolith.py
-          else
-            pyinstaller --onefile regolith.py
-          fi
+        run: pyinstaller --onefile --windowed regolith.py
 
       # Upload the built executable as an artifact
       - name: Upload Linux executable
