@@ -32,13 +32,15 @@ jobs:
           pip install -r requirements.txt
 
       # Build with PyInstaller
-      - name: Build executable with PyInstaller
+      - name: Build executable with PyInstaller (macOS)
+        if: matrix.os == 'macos-latest'
         run: |
-          if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-            pyinstaller --name regolith-mac --onefile regolith.py
-          else
-            pyinstaller --onefile regolith.py
-          fi
+          pyinstaller --name regolith-mac --onefile regolith.py
+
+      - name: Build executable with PyInstaller (Linux/Windows)
+        if: matrix.os != 'macos-latest'
+        run: |
+          pyinstaller --onefile regolith.py
 
       # Upload the built executable as an artifact
       - name: Upload Linux executable
