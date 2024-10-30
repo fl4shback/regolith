@@ -16,11 +16,11 @@ jobs:
     steps:
       # Checkout the repository
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Set up Python
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -31,7 +31,7 @@ jobs:
           pip install pyinstaller
           pip install -r requirements.txt
 
-      # Build with PyInstaller
+      # Separate build steps based on OS
       - name: Build executable with PyInstaller (macOS)
         if: matrix.os == 'macos-latest'
         run: |
@@ -45,21 +45,21 @@ jobs:
       # Upload the built executable as an artifact
       - name: Upload Linux executable
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux-executable
           path: dist/regolith
 
-      - name: Upload macOS .app bundle
+      - name: Upload macOS executable
         if: matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: macos-app
           path: dist/regolith-mac
 
       - name: Upload Windows executable
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: windows-executable
           path: dist/regolith.exe
@@ -70,64 +70,30 @@ jobs:
 
     steps:
       - name: Download Linux executable
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: linux-executable
           path: ./dist/linux
 
       - name: Download macOS .app bundle
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: macos-app
+          name: macos-executable
           path: ./dist/mac
 
       - name: Download Windows executable
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: windows-executable
           path: ./dist/windows
 
-      # Create a GitHub release
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+      # Create a release and upload assets using softprops/action-gh-release
+      - name: Release to GitHub
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          body: |
-            Automatic release for version ${{ github.ref_name }}.
-          draft: false
-          prerelease: false
-
-      # Upload assets to release
-      - name: Upload Linux executable
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/linux/regolith
-          asset_name: regolith-linux
-          asset_content_type: application/octet-stream
-
-      - name: Upload macOS .app bundle
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/mac/regolith.app
-          asset_name: regolith-macos.app.zip
-          asset_content_type: application/zip
-
-      - name: Upload Windows executable
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/windows/regolith.exe
-          asset_name: regolith-windows.exe
-          asset_content_type: application/octet-stream
+          files: |
+            ./dist/linux/regolith
+            ./dist/mac/regolith-mac
+            ./dist/windows/regolith.exe
