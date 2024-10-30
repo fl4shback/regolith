@@ -33,7 +33,12 @@ jobs:
 
       # Build with PyInstaller
       - name: Build executable with PyInstaller
-        run: pyinstaller --onefile regolith.py
+        run: |
+          if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            pyinstaller --target-arch universal2 --name regolith-mac --onefile regolith.py
+          else
+            pyinstaller --onefile regolith.py
+          fi
 
       # Upload the built executable as an artifact
       - name: Upload Linux executable
@@ -48,7 +53,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: macos-app
-          path: dist/regolith.app
+          path: dist/regolith-mac
 
       - name: Upload Windows executable
         if: matrix.os == 'windows-latest'
