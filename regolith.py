@@ -4,7 +4,7 @@ import logging
 import os
 from collections import defaultdict
 
-# Set up logging
+# Uncomment to run w/ debug logs
 # logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -24,55 +24,37 @@ else:
 
 # GraphQL query
 query = """
+fragment SessionFields on PaginatedSessions {
+  items {
+    sessionId
+    name
+    workOrders {
+      nextToken
+      items {
+        ... on ShipMiningOrder {
+          shipOres {
+            ore
+            yield
+          }
+          isSold
+          seller {
+            scName
+            userId
+          }
+          orderId
+        }
+      }
+    }
+  }
+  nextToken
+}
 {
   profile {
     joinedSessions {
-      items {
-        sessionId
-        name
-        workOrders {
-          nextToken
-          items {
-            ... on ShipMiningOrder {
-              shipOres {
-                ore
-                yield
-              }
-              isSold
-              seller {
-                scName
-                userId
-              }
-              orderId
-            }
-          }
-        }
-      }
-      nextToken
+      ...SessionFields
     }
     mySessions {
-      items {
-        sessionId
-        name
-        workOrders {
-          nextToken
-          items {
-            ... on ShipMiningOrder {
-              shipOres {
-                ore
-                yield
-              }
-              isSold
-              seller {
-                scName
-                userId
-              }
-              orderId
-            }
-          }
-        }
-      }
-      nextToken
+      ...SessionFields
     }
   }
 }
@@ -99,61 +81,47 @@ def fetch_graphql_data(query):
 
 # Function to process sessions and aggregate yields
 def process_sessions(data):
-    joined_sessions = {session['sessionId']: session for session in data['data']['profile']['joinedSessions']['items']}
     my_sessions = {session['sessionId']: session for session in data['data']['profile']['mySessions']['items']}
+    joined_sessions = {session['sessionId']: session for session in data['data']['profile']['joinedSessions']['items']}
 
-    log_debug(f"Joined Sessions: {joined_sessions}")
     log_debug(f"My Sessions: {my_sessions}")
+    log_debug(f"Joined Sessions: {joined_sessions}")
 
-    seller_yields = defaultdict(lambda: defaultdict(float))  # seller -> scName -> ore -> yield
-    seller_totals = defaultdict(float)  # seller -> scName -> total SCU
-    available_sellers = set()  # To keep track of sellers with isSold: false
+    seller_yields = defaultdict(lambda: defaultdict(float))  # Store per ore SCU per seller
+    seller_totals = defaultdict(float)  # Store total SCU per seller
+    available_sellers = set()  # Keep track of sellers that have ore to sell
     active_sessions = set()  # Keep ids of sessions w/ ores pending sale
 
-    # Process sessions: prioritize mySessions over joinedSessions
+    # Subfunction to process workorders
+    def process_workorders(session_id, session, session_type, active_sessions, available_sellers, seller_yields, seller_totals):
+      session_name = session['name']
+      log_debug(f"Processing {session_type}: {session_name} - {session_id}")
+
+      if session_id not in active_sessions:
+          active_sessions.add(session_id)
+
+      for order in session['workOrders']['items']:
+          log_debug(f"Processing work order: {order['orderId']} - {session_name}")
+
+          if order['isSold'] is False or order['isSold'] is None:
+              seller_name = order['seller']['scName']
+              available_sellers.add(seller_name)
+
+              for ore_data in order['shipOres']:
+                  ore_type = ore_data['ore']
+                  yield_value = ore_data['yield']
+                  log_debug(f"Adding yield: {yield_value} for ore: {ore_type} from seller: {seller_name}")
+                  seller_yields[seller_name][ore_type] += yield_value # Add to ore SCU
+                  seller_totals[seller_name] += yield_value  # Add to total SCU
+
+    # Process sessions, prioritizing mySessions over joinedSessions
     for session_id, session in my_sessions.items():
-        session_name = session['name']
-        log_debug(f"Processing session: {session_name} - {session_id}")
-        
-        for order in session['workOrders']['items']:
-            log_debug(f"Processing work order: {order['orderId']} - {session_name}")
+        process_workorders(session_id, session, "mySession", active_sessions, available_sellers, seller_yields, seller_totals)
 
-            if order['isSold'] is False or order['isSold'] is None:
-                seller_name = order['seller']['scName']
-                available_sellers.add(seller_name)  # Track available sellers
-
-                if session_id not in active_sessions:
-                    active_sessions.add(session_id)
-                
-                for ore_data in order['shipOres']:
-                    ore_type = ore_data['ore']
-                    yield_value = ore_data['yield']
-                    log_debug(f"Adding yield: {yield_value} for ore: {ore_type} from seller: {seller_name}")
-                    seller_yields[seller_name][ore_type] += yield_value
-                    seller_totals[seller_name] += yield_value  # Add to total SCU
-
-    # Also process joinedSessions for any unique sessions not in mySessions
+    # Process joinedSessions only if the session is not already in mySessions
     for session_id, session in joined_sessions.items():
-        session_name = session['name']
-        if session_id not in my_sessions:  # Only process if not already in mySessions
-            log_debug(f"Processing joined session: {session_name} - {session_id}")
-            # You can add similar processing for workOrders here if needed.
-            for order in session['workOrders']['items']:
-                log_debug(f"Processing work order: {order['orderId']} - {session_name}")
-
-                if order['isSold'] is False or order['isSold'] is None:
-                    seller_name = order['seller']['scName']
-                    available_sellers.add(seller_name)  # Track available sellers
-
-                    if session_id not in active_sessions:
-                      active_sessions.add(session_id)
-                    
-                    for ore_data in order['shipOres']:
-                        ore_type = ore_data['ore']
-                        yield_value = ore_data['yield']
-                        log_debug(f"Adding yield: {yield_value} for ore: {ore_type} from seller: {seller_name}")
-                        seller_yields[seller_name][ore_type] += yield_value
-                        seller_totals[seller_name] += yield_value  # Add to total SCU
+        if session_id not in my_sessions:
+            process_workorders(session_id, session, "joinedSession", active_sessions, available_sellers, seller_yields, seller_totals)
 
     log_debug(f"Seller Yields: {seller_yields}")
     log_debug(f"Seller Totals: {seller_totals}")
