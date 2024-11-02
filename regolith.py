@@ -149,6 +149,11 @@ def main():
     data = fetch_graphql_data(query)
     my_sessions, joined_sessions, seller_yields, seller_totals, available_sellers, active_sessions = process_sessions(data)
 
+    if not active_sessions:
+        print("Aucune session en cours")
+        input("Presser Entrer pour quitter")
+        quit()
+
     print("Sessions Actives:")
     for session_id, session in my_sessions.items():
         if session_id in active_sessions:
