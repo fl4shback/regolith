@@ -152,7 +152,7 @@ def main():
     if not active_sessions:
         print("Aucune session en cours")
         input("Presser Entrer pour quitter")
-        quit()
+        raise SystemExit()
 
     print("Sessions Actives:")
     for session_id, session in my_sessions.items():
