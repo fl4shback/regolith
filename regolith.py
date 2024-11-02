@@ -97,15 +97,16 @@ def process_sessions(data):
       session_name = session['name']
       log_debug(f"Processing {session_type}: {session_name} - {session_id}")
 
-      if session_id not in active_sessions:
-          active_sessions.add(session_id)
-
       for order in session['workOrders']['items']:
           log_debug(f"Processing work order: {order['orderId']} - {session_name}")
 
           if order['isSold'] is False or order['isSold'] is None:
               seller_name = order['seller']['scName']
               available_sellers.add(seller_name)
+
+              # Add session to session list if ores are left to sell
+              if session_id not in active_sessions:
+                active_sessions.add(session_id)
 
               for ore_data in order['shipOres']:
                   ore_type = ore_data['ore']
